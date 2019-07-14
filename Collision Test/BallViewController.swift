@@ -1,5 +1,5 @@
 //
-//  GameViewController.swift
+//  BallViewController.swift
 //  Collision Test
 //
 //  Created by Denis Bystruev on 14/07/2019.
@@ -10,9 +10,11 @@ import UIKit
 import QuartzCore
 import SceneKit
 
-class GameViewController: UIViewController {
+class BallViewController: UIViewController {
     
     // MARK: - Properties
+    static let ballInitialPosition = SCNVector3(x: 0, y: 2, z: 0)
+    
     var sceneView: SCNView? {
         return view as? SCNView
     }
@@ -46,7 +48,7 @@ class GameViewController: UIViewController {
         createSceneView()
         
         // create and add a ball to the scene
-        createBall(y: 2)
+        createBall()
         
         // create and add contact boxes to the scene
         createContactNode(named: "ContactBottom", y: -1)
@@ -64,12 +66,12 @@ class GameViewController: UIViewController {
     }
     
     // MARK: - Custom Methods
-    func createBall(x: Float = 0, y: Float = 0, z: Float = 0) {
+    func createBall(at position: SCNVector3 = ballInitialPosition) {
         let ball = SCNSphere(radius: 0.25)
         ball.firstMaterial?.diffuse.contents = UIColor.orange
         let node = SCNNode(geometry: ball)
         node.name = "Ball"
-        node.position = SCNVector3(x: x, y: y, z: z)
+        node.position = position
         rootNode?.addChildNode(node)
     }
     
@@ -150,6 +152,13 @@ class GameViewController: UIViewController {
             body.categoryBitMask = 1
             ballNode.physicsBody = body
             
+            // move ball to the start after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                ballNode.physicsBody = nil
+                ballNode.position = SCNVector3()
+                ballNode.position = BallViewController.ballInitialPosition
+            }
+            
         case let name where name.hasPrefix("Contact"):
             // retrieve the contact node
             guard let contactNode = rootNode?.childNode(withName: name, recursively: true) else { return }
@@ -163,7 +172,7 @@ class GameViewController: UIViewController {
 }
 
 // MARK: - SCNPhysicsContactDelegate
-extension GameViewController: SCNPhysicsContactDelegate {
+extension BallViewController: SCNPhysicsContactDelegate {
     func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
         print(#line, #function, contact.nodeA, contact.nodeB)
     }
