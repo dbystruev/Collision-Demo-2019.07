@@ -6,44 +6,32 @@
 //  Copyright © 2019 Denis Bystruev. All rights reserved.
 //
 
-import UIKit
-import QuartzCore
 import SceneKit
 
 class BallViewController: UIViewController {
     
     // MARK: - Properties
+    /// Initial position of a ball
     static let ballInitialPosition = SCNVector3(x: 0, y: 2, z: 0)
     
-    var ballsContactedTop = Set<SCNNode>()
+    // Set of balls already contacted top surface
+    private var ballsContactedTop = Set<SCNNode>()
     
-    var score = 0 {
+    // Balls counter
+    private var score = 0 {
         didSet {
             if oldValue != score {
-                updateLabel(with: "Score: \(score)", futureText: "Score: \(score + 1)")
+                updateLabel(with: "Score: \(score)")
             }
         }
     }
     
-    private var futureLabelNode: SCNNode?
-    private var labelPosition = SCNVector3()
-    private var frameStartTime = TimeInterval(0)
-    private var frameEndTime: TimeInterval!
-    private var maxTimeBetweenFrames = TimeInterval(0) {
-        didSet {
-            print(#line, #function, maxTimeBetweenFrames)
-        }
-    }
-    private var maxFrameRenderTime = TimeInterval(0) {
-        didSet {
-            print(#line, #function, maxFrameRenderTime)
-        }
-    }
-    
+    /// Main scene view
     var sceneView: SCNView? {
         return view as? SCNView
     }
     
+    /// Root node of the main scene
     var rootNode: SCNNode? {
         return sceneView?.scene?.rootNode
     }
@@ -80,7 +68,7 @@ class BallViewController: UIViewController {
         createContactNode(named: "ContactTop", y: 1)
         
         // create and add a label to the scene
-        createLabel(z: -1)
+        createLabel("Score: 0", z: -1)
         
         // create and add a camera to the scene
         createCamera(z: 5)
@@ -100,18 +88,22 @@ class BallViewController: UIViewController {
     func createBall(at position: SCNVector3 = ballInitialPosition) {
         let ball = SCNSphere(radius: 0.25)
         ball.firstMaterial?.diffuse.contents = UIColor.orange
+        
         let node = SCNNode(geometry: ball)
         node.name = "Ball"
         node.position = position
+        
         rootNode?.addChildNode(node)
     }
     
     func createContactNode(named name: String, x: Float = 0, y: Float = 0, z: Float = 0) {
+        // create the box geometry and assign it to a node
         let box = SCNBox(width: 1, height: 0.1, length: 1, chamferRadius: 1)
         let node = SCNNode(geometry: box)
         node.name = name
         node.opacity = 0.9999999
         node.position = SCNVector3(x, y, z)
+        
         rootNode?.addChildNode(node)
         
         // add physics body
@@ -133,9 +125,24 @@ class BallViewController: UIViewController {
         cameraNode.position = SCNVector3(x, y, z)
     }
     
-    func createLabel(x: Float = 0, y: Float = 0, z: Float = 0) {
-        labelPosition = SCNVector3(x, y, z)
-        updateLabel(with: "Score: \(score)", futureText: "Score: \(score + 1)")
+    func createLabel(_ text: String, x: Float = 0, y: Float = 0, z: Float = 0) {
+        let scale = Float(0.01)
+        
+        let textGeometry = SCNText(string: text, extrusionDepth: 0)
+        textGeometry.firstMaterial?.isDoubleSided = true
+        
+        let boundingBox = textGeometry.boundingBox
+        let width = scale * (boundingBox.max.x - boundingBox.min.x)
+        let height = scale * (boundingBox.max.y - boundingBox.min.y)
+        let labelNode = SCNNode(geometry: textGeometry)
+        
+        labelNode.name = "Label"
+        labelNode.pivot = SCNMatrix4MakeTranslation(width / 2 / scale, height / 2 / scale, 0)
+        labelNode.position = SCNVector3(x, y, z)
+        labelNode.scale = SCNVector3(scale, scale, scale)
+        labelNode.runAction(.repeatForever(.rotateBy(x: 0, y: .pi, z: 0, duration: 1)))
+        
+        rootNode?.addChildNode(labelNode)
     }
     
     func createLights(x: Float = 0, y: Float = 0, z: Float = 0) {
@@ -161,9 +168,6 @@ class BallViewController: UIViewController {
         // configure the view
         sceneView?.backgroundColor = UIColor.black
         
-        // set self as SCNSceneRendererDelegate delegate
-        sceneView?.delegate = self
-        
         // create new scene
         let scene = SCNScene()
         scene.physicsWorld.contactDelegate = self
@@ -172,31 +176,12 @@ class BallViewController: UIViewController {
         // show statistics such as fps and timing information
         sceneView?.showsStatistics = true
     }
-    
-    func updateLabel(with text: String, futureText: String? = nil) {
-        let scale = Float(0.01)
-        
-        let oldNode = rootNode?.childNode(withName: "Label", recursively: true)
-        oldNode?.removeFromParentNode()
-        
-        let textGeometry = futureLabelNode?.geometry ?? SCNText(string: text, extrusionDepth: 0)
+
+    func updateLabel(with text: String) {
+        guard let labelNode = rootNode?.childNode(withName: "Label", recursively: false) else { return }
+        let textGeometry = SCNText(string: text, extrusionDepth: 0)
         textGeometry.firstMaterial?.isDoubleSided = true
-        let boundingBox = textGeometry.boundingBox
-        let width = scale * (boundingBox.max.x - boundingBox.min.x)
-        let height = scale * (boundingBox.max.y - boundingBox.min.y)
-        let labelNode = futureLabelNode ?? SCNNode(geometry: textGeometry)
-        labelNode.name = "Label"
-        labelNode.pivot = SCNMatrix4MakeTranslation(width / 2 / scale, height / 2 / scale, 0)
-        labelNode.position = SCNVector3(labelPosition.x, labelPosition.y, labelPosition.z)
-        labelNode.scale = SCNVector3(scale, scale, scale)
-        labelNode.runAction(.repeatForever(.rotateBy(x: 0, y: .pi, z: 0, duration: 1)))
-        rootNode?.addChildNode(labelNode)
-        
-        if let futureText = futureText {
-            futureLabelNode = SCNNode(geometry: SCNText(string: futureText, extrusionDepth: 0))
-        } else {
-            futureLabelNode = nil
-        }
+        labelNode.geometry = textGeometry
     }
     
     // MARK: - Actions
@@ -211,13 +196,15 @@ class BallViewController: UIViewController {
             
         case "Ball":
             // retrieve the ball
-            guard let ballNode = rootNode?.childNode(withName: "Ball", recursively: true) else { return }
+            guard let ballNode = rootNode?.childNode(withName: "Ball", recursively: false) else { return }
+            
+            // assign a physics body to the ball
             let shape = SCNPhysicsShape(node: ballNode)
             let body = SCNPhysicsBody(type: .dynamic, shape: shape)
             body.categoryBitMask = 1
             ballNode.physicsBody = body
             
-            // move ball to the start after 2 seconds
+            // move the ball to the start after 2 seconds
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 ballNode.physicsBody = nil
                 let position = ballNode.position.y == SCNVector3().y ? SCNVector3(0, 1, 0) : SCNVector3()
@@ -227,7 +214,9 @@ class BallViewController: UIViewController {
             
         case let name where name.hasPrefix("Contact"):
             // retrieve the contact node
-            guard let contactNode = rootNode?.childNode(withName: name, recursively: true) else { return }
+            guard let contactNode = rootNode?.childNode(withName: name, recursively: false) else { return }
+            
+            // toggle contact node's visibility
             contactNode.opacity = 1 - contactNode.opacity
             
         default:
@@ -273,24 +262,6 @@ extension BallViewController: SCNPhysicsContactDelegate {
         default:
             return
             
-        }
-    }
-}
-
-extension BallViewController: SCNSceneRendererDelegate {
-    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-        frameStartTime = time
-        let timeBetweenFrames = frameEndTime == nil ? 0 : frameStartTime - frameEndTime
-        if maxTimeBetweenFrames < timeBetweenFrames {
-            maxTimeBetweenFrames = timeBetweenFrames
-        }
-    }
-    
-    func renderer(_ renderer: SCNSceneRenderer, didRenderScene scene: SCNScene, atTime time: TimeInterval) {
-        frameEndTime = time
-        let frameRenderTime = frameEndTime - frameStartTime
-        if maxFrameRenderTime < frameRenderTime {
-            maxFrameRenderTime = frameRenderTime
         }
     }
 }
