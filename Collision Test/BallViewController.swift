@@ -76,24 +76,25 @@ class BallViewController: UIViewController {
         // create and add lights to the scene
         createLights(x: 0, y: 10, z: 10)
         
+        // create and add invisible wall to the scene
+        createWall()
+        
         // add a tap gesture recognizer
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         sceneView?.addGestureRecognizer(tapGesture)
-        
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-//        sceneView?.addGestureRecognizer(panGesture)
     }
     
     // MARK: - Custom Methods
     func createBall(at position: SCNVector3 = ballInitialPosition) {
+        // create and place ball
         let ball = SCNSphere(radius: 0.25)
         ball.firstMaterial?.diffuse.contents = UIColor.orange
         
-        let node = SCNNode(geometry: ball)
-        node.name = "Ball"
-        node.position = position
+        let ballNode = SCNNode(geometry: ball)
+        ballNode.name = "Ball"
+        ballNode.position = position
         
-        rootNode?.addChildNode(node)
+        rootNode?.addChildNode(ballNode)
     }
     
     func createContactNode(named name: String, x: Float = 0, y: Float = 0, z: Float = 0) {
@@ -176,6 +177,18 @@ class BallViewController: UIViewController {
         // show statistics such as fps and timing information
         sceneView?.showsStatistics = true
     }
+    
+    func createWall(x: Float = 0, y: Float = 0, z: Float = 0) {
+        // create and place invisible wall
+        let wall = SCNPlane(width: 10, height: 10)
+        
+        let wallNode = SCNNode(geometry: wall)
+        wallNode.name = "Wall"
+        wallNode.opacity = 0.0000001
+        wallNode.position = SCNVector3(x, y, z)
+        
+        rootNode?.addChildNode(wallNode)
+    }
 
     func updateLabel(with text: String) {
         guard let labelNode = rootNode?.childNode(withName: "Label", recursively: false) else { return }
@@ -204,8 +217,8 @@ class BallViewController: UIViewController {
             body.categoryBitMask = 1
             ballNode.physicsBody = body
             
-            // move the ball to the start after 2 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            // move the ball to the start after 3 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                 ballNode.physicsBody = nil
                 let position = ballNode.position.y == SCNVector3().y ? SCNVector3(0, 1, 0) : SCNVector3()
                 ballNode.position = position
@@ -219,15 +232,15 @@ class BallViewController: UIViewController {
             // toggle contact node's visibility
             contactNode.opacity = 1 - contactNode.opacity
             
+        case "Wall":
+            // retrieve the ball
+            guard let ballNode = rootNode?.childNode(withName: "Ball", recursively: false) else { return }
+            ballNode.position = hitResult.worldCoordinates
+            
         default:
             return
             
         }
-    }
-    
-    @objc
-    func handlePan(_ gestureRecognize: UIPanGestureRecognizer) {
-        
     }
 }
 
